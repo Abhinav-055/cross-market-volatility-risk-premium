@@ -1,0 +1,76 @@
+# Single source of truth for all parameters used across src/. No magic numbers in code.
+
+sample:
+  start_date: "2010-01-01"
+  end_date: "2024-12-31"
+
+paths:
+  raw_bhavcopy_csv: "data/raw/fobhav.csv"          # Kaggle NSE F&O dump, Jun 2000 - Aug 2020
+  raw_bhavcopy_daily_dir: "data/raw/bhavcopy_daily" # post-2020-08 daily files from download_bhavcopy.py
+  processed_dir: "data/processed"
+
+markets:
+  nifty:
+    fo_symbol: "NIFTY"        # SYMBOL value in the NSE bhavcopy schema
+    spot_ticker: "^NSEI"      # yfinance
+    vix_ticker: "^INDIAVIX"   # yfinance, cross-check only, not primary series
+  spx:
+    spot_ticker: "^GSPC"      # yfinance
+    vix_ticker: "^VIX"        # yfinance, used as the 1M ATM IV proxy (VIX/100)
+    hedge_ticker: "SPY"       # delta-hedge instrument for the SPX strategy leg
+
+cleaning:
+  dte_min: 7
+  dte_max: 90
+  log_moneyness_max: 0.3          # drop |log(K/F)| > this
+  min_strikes_per_day: 5
+  pcp_residual_max_pct: 0.02      # put-call parity residual, as fraction of forward
+  expiry_scope: "monthly"         # main analysis; weeklies handled separately in Part 6
+  # source-file quirks discovered during profiling of the Kaggle CSV:
+  timestamp_formats: ["%d-%b-%Y", "%-d-%b-%Y"]   # inconsistent zero-padding across concatenated years
+  min_valid_year: 2000
+  max_valid_year: 2025            # bounds out malformed 2-digit-year TIMESTAMP rows
+  drop_embedded_header_rows: true # ~43 duplicate header rows are embedded mid-file
+
+iv:
+  method: "black76"
+  root_finder: "brentq"
+  vol_bounds: [0.01, 3.0]
+  price_tol: 1.0e-8
+  constant_maturity_target_days: 30
+  # Black-76 is priced off the matched-expiry NIFTY future, so no separate dividend-yield
+  # estimate is needed. The discount rate is derived per-date from the spot/future
+  # cost-of-carry relationship (r_impl = ln(F/S)/T) rather than an external rate series.
+  rate_method: "implied_from_futures_carry"
+
+realized_vol:
+  window_days: 21
+  annualization_factor: 252
+
+vrp:
+  rv_forecast_methods: ["ex_post", "har"]
+  regime_split_dates:
+    nifty: "2020-04-01"   # post-COVID Indian retail options-flow regime break
+    spx: "2018-02-01"     # post-Volmageddon vol regime break
+
+strategy:
+  entry_rule: "day_after_monthly_expiry"
+  target_dte: 30
+  hedge_frequency: "daily"
+  costs:
+    nifty:
+      hedge_bps_notional: 0.5
+      option_roundtrip_pct_premium: 0.03
+    spx:
+      hedge_bps_notional: 0.2
+      option_roundtrip_pct_premium: 0.01
+    sensitivity_multipliers: [0.5, 1.5]
+
+live_paper_trade:
+  min_weeks: 4
+  target_weeks: 8
+
+newey_west:
+  lag: 21   # matches the 21-trading-day overlap of the forecast horizon
+
+random_seed: 42
