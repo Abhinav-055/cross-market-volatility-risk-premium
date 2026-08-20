@@ -67,4 +67,4 @@ python run.py                          # regenerates every processed file, table
 python -m src.live.update_daily        # advances the live paper-trade by one day (run daily)
 ```
 
-`data/raw/fobhav.csv` (the Kaggle NSE F&O dump) must be placed manually — it's gitignored for size. See `analysis.ipynb` for the full narrative walkthrough and `blog_post.md` for a plain-language write-up.
+`data/raw/fobhav.csv` (the Kaggle NSE F&O dump) must be placed manually — it's gitignored for size. See `analysis.ipynb` for the full narrative walkthrough.
